@@ -1,0 +1,31 @@
+# Project vocabulary. Words listed here are accepted as spelled.
+#
+# Vale.Spelling is a warning, so this list exists to keep the warnings
+# meaningful: add a term when it is deliberate, not to silence a typo.
+
+pi
+CLI
+mermaid
+Mermaid
+intercom
+Intercom
+monorepo
+repo
+repos
+kebab
+env
+README
+worktree
+worktrees
+npm
+Node
+stdout
+stdin
+runtime
+subtask
+subtasks
+toolchain
+token
+tokens
+config
+configs

@@ -1,0 +1,29 @@
+name: review
+
+on:
+  pull_request:
+
+# Cite reviews the pull request through the GitHub API, so it needs no
+# checkout of the pull-request head and executes nothing from it.
+#
+# This repository has no MODEL_API_KEY secret, so Cite runs on GitHub's own
+# models endpoint with the ambient token (`models: read` below), which is rate
+# limited but needs no account and no key. To bring your own key, add a
+# MODEL_API_KEY repository secret and pass it as the env shown at the bottom.
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+  models: read
+
+concurrency:
+  group: cite-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: elecnix/cite@v0.8.0
+        # env:
+        #   MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}

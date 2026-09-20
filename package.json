@@ -1,0 +1,27 @@
+{
+  "name": "pi-agent-name",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Standalone agent names for pi sessions: a persistent, human-readable identity with no daemon and no intercom dependency.",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "agent",
+    "identity",
+    "name"
+  ],
+  "author": "Nicolas Bailon <nicolas@elecnix.dev>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elecnix/pi-agent-name.git"
+  },
+  "pi": {
+    "extensions": [
+      "./agent-name/index.ts"
+    ]
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  }
+}

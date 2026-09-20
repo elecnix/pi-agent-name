@@ -1,0 +1,19 @@
+name: dupdelta
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dupdelta:
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 makes the merge-base reachable, which is what dupdelta
+      # scans as "before".
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: elecnix/dupdelta@v0.2.0

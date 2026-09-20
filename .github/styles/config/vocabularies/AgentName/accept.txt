@@ -9,6 +9,10 @@ mermaid
 Mermaid
 intercom
 Intercom
+dupdelta
+Cite
+Vale
+vale
 monorepo
 repo
 repos

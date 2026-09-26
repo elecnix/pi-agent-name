@@ -1,0 +1,30 @@
+name: PR body
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+# The description and its mermaid diagrams are read through the GitHub API, so
+# the format checks need no checkout of the pull-request head and execute
+# nothing from it. The prose step reads this repository's own .vale.ini, and it
+# takes those rules from the BASE ref: a pull request must not be able to
+# rewrite the rules it is checked against. On the pull request that introduces
+# the config, the prose step therefore reports "skipped, no rules found"; from
+# the next pull request on, main supplies them.
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  pr-body:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - uses: elecnix/gh-pr-body-action@16953182e3b991b7d081d844b395754fdfb91880  # v1.1.0
+        with:
+          # Prose findings block: the description is documentation too.
+          prose-fail: 'true'
+          node-version: '22'

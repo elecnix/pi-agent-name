@@ -21,11 +21,15 @@ import { createHash } from "node:crypto";
 export const FORK_SUFFIX_LENGTH = 8;
 
 /**
- * The suffix a forked child carries, recognised without recomputing it.
- * Minted names end in a one or two digit number, so a trailing 8-hex group is
- * unambiguous. Kept in step with `FORK_SUFFIX_LENGTH`.
+ * A complete name of the shape this module produces for a forked child:
+ * `word-word-<1-2 digits>-<8 hex>`.
+ *
+ * Matching the whole name rather than a trailing `-<8 hex>` keeps the test
+ * exact: a name that merely ends in eight hex characters — a pinned name, or a
+ * word that happens to look like hex — is not treated as already suffixed, so
+ * it is still re-identified. Kept in step with `FORK_SUFFIX_LENGTH`.
  */
-const FORK_SUFFIX_PATTERN = /-[0-9a-f]{8}$/;
+const FORK_SUFFIX_PATTERN = /^[a-z]+-[a-z]+-\d{1,2}-[0-9a-f]{8}$/;
 
 /** Minimal shape of a session header (`SessionManager.getHeader()`). */
 export interface SessionHeaderLike {

@@ -68,6 +68,25 @@ describe("maybeSuffixForkIdentity", () => {
 		);
 	});
 
+	it("only treats the forked shape as already suffixed", () => {
+		// The pattern must describe exactly the names this module produces, so a
+		// name that merely ends in eight hex characters is still re-identified.
+		const suffixed = composeForkIdentity("swift-koala-42", SESSION);
+		assert.equal(maybeSuffixForkIdentity(suffixed, { parentSession: "p" }, OTHER_SESSION), suffixed);
+
+		for (const notSuffixed of [
+			"swift-deadbeef-12",
+			"swift-koala-deadbeef",
+			"swift-koala-42-abcdef1",
+		]) {
+			assert.notEqual(
+				maybeSuffixForkIdentity(notSuffixed, { parentSession: "p" }, SESSION),
+				notSuffixed,
+				notSuffixed,
+			);
+		}
+	});
+
 	it("returns an empty name unchanged", () => {
 		assert.equal(maybeSuffixForkIdentity("", { parentSession: "parent.jsonl" }, SESSION), "");
 	});

@@ -18,10 +18,11 @@
  * extension, so installing both converges on one name instead of minting two.
  */
 
-import type { ExtensionAPI, BashToolCallEvent } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { applyAgentNameEnv } from "./env.ts";
+import { addCoAuthorTrailer } from "./commit-trailer.ts";
 import { maybeSuffixForkIdentity } from "./fork-identity.ts";
 import { buildIdentityPrompt } from "./identity-prompt.ts";
 import { NAME_ENV, OWN_NAME_ENTRY, SHARED_NAME_ENTRY, isWellFormedAgentName, restoreAgentName } from "./persisted-name.ts";
@@ -34,23 +35,6 @@ let agentName = "";
 function persistAgentName(pi: ExtensionAPI, name: string): void {
 	pi.appendEntry(OWN_NAME_ENTRY, { name });
 	pi.appendEntry(SHARED_NAME_ENTRY, { name });
-}
-
-function checkBashForGitCommit(event: BashToolCallEvent, name: string): void {
-	if (!name) return;
-
-	const cmd = event.input.command ?? "";
-	if (!/\bgit\s+commit\b/.test(cmd)) return;
-	if (/Co-authored-by:/.test(cmd)) return;
-	if (/--trailer\s/.test(cmd)) return;
-	if (/--no-edit/.test(cmd)) return;
-
-	const trailer = `"Co-authored-by: ${name} <${name}@pi-agent.local>"`;
-	if (cmd.includes(" -m ") || cmd.includes(' -m"') || cmd.includes(" -m'")) {
-		event.input.command = cmd.replace(/(\bgit\s+commit\b.*)$/, `$1 --trailer ${trailer}`);
-	} else if (/\bgit\s+commit\s*$/.test(cmd.trim())) {
-		event.input.command = `${cmd} --trailer ${trailer}`;
-	}
 }
 
 export default function (pi: ExtensionAPI) {
@@ -100,11 +84,12 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	// Sign commits automatically; the prompt rule asks for the trailer, this
-	// makes it true even when the agent forgets.
+	// makes it true even when the agent forgets. The rewrite understands shell
+	// chains, so the trailer stays on the commit rather than the command after it.
 	pi.on("tool_call", async (event) => {
 		if (event.toolName !== "bash") return;
 		if (!isToolCallEventType("bash", event)) return;
-		checkBashForGitCommit(event, agentName);
+		event.input.command = addCoAuthorTrailer(event.input.command ?? "", agentName);
 	});
 
 	pi.registerTool({

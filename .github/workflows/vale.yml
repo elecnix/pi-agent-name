@@ -11,8 +11,10 @@ jobs:
   vale:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: vale-cli/vale-action@v3
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          persist-credentials: false
+      - uses: vale-cli/vale-action@518a9136acc6e6668ce7c00d367051e0941e87ff  # v3
         with:
           # Pinned to the version the configuration was validated against.
           version: 3.20.0

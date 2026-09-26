@@ -13,7 +13,8 @@ jobs:
     steps:
       # fetch-depth: 0 makes the merge-base reachable, which is what dupdelta
       # scans as "before".
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
         with:
           fetch-depth: 0
-      - uses: elecnix/dupdelta@v0.2.0
+          persist-credentials: false
+      - uses: elecnix/dupdelta@658504a2c2fc19ced01337e2e84c79aa4699a7a7  # v0.2.0

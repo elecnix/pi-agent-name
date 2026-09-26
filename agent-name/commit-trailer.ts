@@ -14,6 +14,8 @@
  * Kept free of pi imports so it is unit-testable with plain `node --test`.
  */
 
+import { isWellFormedAgentName } from "./persisted-name.ts";
+
 /** Domain used for the agent's synthetic co-author address. */
 export const CO_AUTHOR_EMAIL_DOMAIN = "pi-agent.local";
 
@@ -106,13 +108,19 @@ function splitCommand(command: string): Segment[] {
 /**
  * Add the agent's co-author trailer to every `git commit` in `command`.
  *
- * Returns the command unchanged when there is nothing to do: no name, a commit
- * that already names a co-author, a commit that already passes `--trailer`, or
- * a command that commits nothing.
+ * Returns the command unchanged when there is nothing to do: no name, a name
+ * that is not a well-formed identity, a commit that already names a co-author,
+ * a commit that already passes `--trailer`, or a command that commits nothing.
+ *
+ * The name is validated rather than escaped: the trailer is appended to a shell
+ * command, so a name carrying a quote, `$`, or a backtick would escape the
+ * quoting and be executed. Only names this extension could have minted are
+ * accepted, which keeps the rewrite safe by construction.
  */
 export function addCoAuthorTrailer(command: string, agentName: string): string {
 	const name = agentName.trim();
 	if (!name) return command;
+	if (!isWellFormedAgentName(name)) return command;
 	if (/Co-authored-by:/.test(command)) return command;
 
 	const trailer = `--trailer "${coAuthorTrailer(name)}"`;

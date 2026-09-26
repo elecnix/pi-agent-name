@@ -132,6 +132,21 @@ describe("addCoAuthorTrailer", () => {
 		);
 	});
 
+	it("refuses a name that would break out of the shell quoting", () => {
+		// The trailer is appended to a shell command, so a name carrying shell
+		// syntax must never reach it.
+		for (const unsafe of [
+			'x" ; rm -rf ~ ; echo "',
+			"x$(id)",
+			"x`id`",
+			"x'; echo '",
+			"swift-koala-42 && echo pwned",
+			"swift koala 42",
+		]) {
+			assert.equal(addCoAuthorTrailer("git commit -m x", unsafe), "git commit -m x", unsafe);
+		}
+	});
+
 	it("does nothing without a name", () => {
 		assert.equal(addCoAuthorTrailer("git commit -m x", ""), "git commit -m x");
 		assert.equal(addCoAuthorTrailer("git commit -m x", "   "), "git commit -m x");

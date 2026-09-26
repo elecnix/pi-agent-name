@@ -4,12 +4,18 @@
  * Every commit an agent makes must carry its `Co-authored-by` trailer, so the
  * `bash` tool call is rewritten before it runs. The rewrite has to survive real
  * shell syntax: a commit is frequently chained (`git commit -m x && git push`),
- * may carry environment assignments, and the word `git commit` may appear
- * inside a quoted string that is not a command at all.
+ * may carry environment assignments or git's own global options
+ * (`git -c user.name=x commit`), and the words `git commit` may appear inside a
+ * quoted string that is not a command at all.
  *
- * Splitting the command into top-level segments first, and only then deciding
- * whether a segment *is* a commit, is what keeps the trailer attached to the
- * commit rather than to whatever follows it.
+ * Two rules keep the rewrite honest:
+ *
+ *   - the trailer belongs to the commit's own segment, so it is inserted there
+ *     rather than at the end of the command;
+ *   - the agent must be credited exactly once, so the trailer is skipped only
+ *     when the commit itself already credits *this* agent. Crediting somebody
+ *     else, or merely mentioning the words elsewhere in the command, does not
+ *     suppress it — otherwise a stray string would leave the commit unsigned.
  *
  * Kept free of pi imports so it is unit-testable with plain `node --test`.
  */
@@ -25,23 +31,41 @@ interface Segment {
 	separator: string;
 }
 
-/** `git` optionally preceded by `VAR=value` environment assignments. */
-const COMMIT_SEGMENT = /^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*git\s+commit(?:\s|$)/;
+/**
+ * A segment that is a `git commit`, optionally behind environment assignments
+ * and git's global options (`-c name=value`, `-C path`, `--no-pager`,
+ * `--git-dir=…`).
+ */
+const COMMIT_SEGMENT =
+	/^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*git\s+(?:(?:-\w\s+\S+|--?[A-Za-z][\w-]*(?:=\S+)?)\s+)*commit(?:\s|$)/;
 
 /** The trailer git expects for an agent name. */
 export function coAuthorTrailer(agentName: string): string {
 	return `Co-authored-by: ${agentName} <${agentName}@${CO_AUTHOR_EMAIL_DOMAIN}>`;
 }
 
+/** True when `text` already credits `name` as a co-author. */
+function alreadyCredits(text: string, name: string): boolean {
+	const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	return new RegExp(`co-authored-by:\\s*${escaped}(?:\\s|>|$)`, "i").test(text);
+}
+
 /**
  * Split a command into its top-level segments, keeping each separator so the
  * command can be rebuilt byte for byte when nothing is rewritten.
  *
+ * Only operators that separate commands split here: `&&`, `||`, `;`, `|`, `&`,
+ * a newline. Redirections (`>`, `2>&1`) deliberately do not, because they are
+ * transparent to the command — splitting on them turns `git commit -m x 2>&1`
+ * into an argument `2` and a mangled `>&1`.
+ *
  * Quotes are tracked so an operator inside a quoted argument (`-m "a && b"`)
  * does not split the command, and a `git commit` inside a quoted string is
- * never mistaken for the command itself.
+ * never mistaken for the command itself. Returns `null` when quoting is
+ * unbalanced: the command is not valid shell, and rewriting it would risk
+ * placing the trailer inside a string.
  */
-function splitCommand(command: string): Segment[] {
+function splitCommand(command: string): Segment[] | null {
 	const segments: Segment[] = [];
 	let start = 0;
 	let index = 0;
@@ -58,7 +82,7 @@ function splitCommand(command: string): Segment[] {
 		if (quote) {
 			// Inside double quotes a backslash escapes the next character.
 			if (char === "\\" && quote === '"') {
-				index += 2;
+				index = Math.min(index + 2, command.length);
 				continue;
 			}
 			if (char === quote) quote = null;
@@ -73,13 +97,20 @@ function splitCommand(command: string): Segment[] {
 		}
 
 		if (char === "\\") {
-			index += 2;
+			index = Math.min(index + 2, command.length);
 			continue;
 		}
 
 		if (char === "&" || char === "|") {
-			const pair = command.slice(index, index + 2);
-			const length = pair === "&&" || pair === "||" ? 2 : 1;
+			const previous = index > 0 ? command[index - 1] : "";
+			const next = command[index + 1] ?? "";
+			// `>&1`, `<&0`, and `&>` are redirections, not command separators:
+			// their ampersand belongs to the operator that precedes it.
+			if (char === "&" && (previous === ">" || previous === "<" || next === ">")) {
+				index += 1;
+				continue;
+			}
+			const length = next === char || (char === "|" && next === "&") ? 2 : 1;
 			push(index, index + length);
 			index += length;
 			continue;
@@ -91,15 +122,10 @@ function splitCommand(command: string): Segment[] {
 			continue;
 		}
 
-		if (char === ">" || char === "<") {
-			const length = command[index + 1] === ">" ? 2 : 1;
-			push(index, index + length);
-			index += length;
-			continue;
-		}
-
 		index += 1;
 	}
+
+	if (quote) return null;
 
 	push(command.length, command.length);
 	return segments;
@@ -109,8 +135,8 @@ function splitCommand(command: string): Segment[] {
  * Add the agent's co-author trailer to every `git commit` in `command`.
  *
  * Returns the command unchanged when there is nothing to do: no name, a name
- * that is not a well-formed identity, a commit that already names a co-author,
- * a commit that already passes `--trailer`, or a command that commits nothing.
+ * that is not a well-formed identity, a commit that already credits this agent,
+ * malformed shell, or a command that commits nothing.
  *
  * The name is validated rather than escaped: the trailer is appended to a shell
  * command, so a name carrying a quote, `$`, or a backtick would escape the
@@ -121,14 +147,15 @@ export function addCoAuthorTrailer(command: string, agentName: string): string {
 	const name = agentName.trim();
 	if (!name) return command;
 	if (!isWellFormedAgentName(name)) return command;
-	if (/Co-authored-by:/.test(command)) return command;
+
+	const segments = splitCommand(command);
+	if (!segments) return command;
 
 	const trailer = `--trailer "${coAuthorTrailer(name)}"`;
 
-	return splitCommand(command)
+	return segments
 		.map((segment) => {
-			const isCommit =
-				COMMIT_SEGMENT.test(segment.text) && !/--trailer\b/.test(segment.text);
+			const isCommit = COMMIT_SEGMENT.test(segment.text) && !alreadyCredits(segment.text, name);
 			if (!isCommit) return segment.text + segment.separator;
 			// Drop trailing blanks so the trailer sits next to the arguments and
 			// one space is left before the separator that follows.

@@ -46,6 +46,37 @@ describe("addCoAuthorTrailer", () => {
 		);
 	});
 
+	it("keeps a redirection attached to its commit", () => {
+		// Regression: splitting on `>` turned `2>&1` into the argument `2` plus a
+		// mangled `>&1`, so git saw a pathspec named `2`.
+		assert.equal(
+			addCoAuthorTrailer("git commit -m x 2>&1", NAME),
+			`git commit -m x 2>&1 ${TRAILER}`,
+		);
+		assert.equal(
+			addCoAuthorTrailer("git commit -m x > log", NAME),
+			`git commit -m x > log ${TRAILER}`,
+		);
+	});
+
+	it("recognises a commit behind git's own global options", () => {
+		for (const command of [
+			"git -c user.name=x commit -m y",
+			"git -C /repo commit -m y",
+			"git --no-pager commit -m y",
+			"git --git-dir=/tmp/g commit -m y",
+		]) {
+			assert.equal(addCoAuthorTrailer(command, NAME), `${command} ${TRAILER}`, command);
+		}
+	});
+
+	it("leaves malformed shell alone", () => {
+		// Unbalanced quoting means the command is not valid shell; guessing at it
+		// could put the trailer inside a string.
+		assert.equal(addCoAuthorTrailer('git commit -m "a\\', NAME), 'git commit -m "a\\');
+		assert.equal(addCoAuthorTrailer("git commit -m 'a", NAME), "git commit -m 'a");
+	});
+
 	it("keeps the trailer inside the commit when the command is chained", () => {
 		// Regression: the trailer used to land on `git push`.
 		assert.equal(
@@ -65,10 +96,6 @@ describe("addCoAuthorTrailer", () => {
 		assert.equal(
 			addCoAuthorTrailer("git commit -m x | tee out", NAME),
 			`git commit -m x ${TRAILER} | tee out`,
-		);
-		assert.equal(
-			addCoAuthorTrailer("git commit -m x > log", NAME),
-			`git commit -m x ${TRAILER} > log`,
 		);
 	});
 
@@ -93,14 +120,38 @@ describe("addCoAuthorTrailer", () => {
 		);
 	});
 
-	it("leaves a command that already names a co-author alone", () => {
-		const command = `git commit -m "x" --trailer "Co-authored-by: someone <s@example.com>"`;
-		assert.equal(addCoAuthorTrailer(command, NAME), command);
+	it("still credits the agent when the commit names another co-author", () => {
+		// Crediting someone else is not crediting this agent.
+		assert.equal(
+			addCoAuthorTrailer(`git commit -m "x" --trailer "Co-authored-by: someone <s@example.com>"`, NAME),
+			`git commit -m "x" --trailer "Co-authored-by: someone <s@example.com>" ${TRAILER}`,
+		);
 	});
 
-	it("leaves a command that already has a trailer alone", () => {
-		const command = `git commit -m "x" --trailer "Signed-off-by: me"`;
-		assert.equal(addCoAuthorTrailer(command, NAME), command);
+	it("still credits the agent when the commit has an unrelated trailer", () => {
+		assert.equal(
+			addCoAuthorTrailer(`git commit -m "x" --trailer "Signed-off-by: me"`, NAME),
+			`git commit -m "x" --trailer "Signed-off-by: me" ${TRAILER}`,
+		);
+	});
+
+	it("leaves a commit that already credits this agent alone", () => {
+		for (const command of [
+			`git commit -m "x" --trailer "Co-authored-by: ${NAME} <${NAME}@pi-agent.local>"`,
+			`git commit -m "x" --trailer "co-authored-by: ${NAME} <${NAME}@pi-agent.local>"`,
+			`git commit -m "body\n\nCo-authored-by: ${NAME} <${NAME}@pi-agent.local>"`,
+		]) {
+			assert.equal(addCoAuthorTrailer(command, NAME), command);
+		}
+	});
+
+	it("credits the agent when another command in the chain mentions the trailer", () => {
+		// Regression: the guard used to test the whole command, so merely echoing
+		// the words suppressed the trailer on a real commit.
+		assert.equal(
+			addCoAuthorTrailer(`echo "Co-authored-by: x" && git commit -m y`, NAME),
+			`echo "Co-authored-by: x" && git commit -m y ${TRAILER}`,
+		);
 	});
 
 	it("ignores commands that are not commits", () => {

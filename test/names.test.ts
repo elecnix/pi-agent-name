@@ -77,10 +77,17 @@ describe("generateName", () => {
 		}
 	});
 
-	it("survives a source that returns the exclusive upper bound", () => {
-		// Defensive: a hostile or broken source must not produce `undefined`.
-		const outOfRange: RandomSource = (max) => max;
-		assert.match(generateName(outOfRange), /^[a-z]+-[a-z]+-\d+$/);
+	it("stays well formed whatever a broken source returns", () => {
+		// The source is injectable, so it must not be able to produce a name the
+		// rest of the extension would reject. `max` is the exclusive bound, and
+		// anything negative, fractional, or non-numeric is equally nonsense.
+		for (const draw of [0, 1, -1, 999, 1.5, -0.5, NaN, Infinity]) {
+			const broken: RandomSource = () => draw;
+			const name = generateName(broken);
+			assert.match(name, /^[a-z]+-[a-z]+-\d{1,2}$/, `draw ${draw} produced ${name}`);
+			assert.ok(ADJECTIVES.includes(name.split("-")[0] as never));
+			assert.ok(ANIMALS.includes(name.split("-")[1] as never));
+		}
 	});
 });
 

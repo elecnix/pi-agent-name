@@ -97,14 +97,31 @@ const cryptoRandomSource: RandomSource = (max) => randomInt(0, max);
 export const MAX_MINT_ATTEMPTS = 10;
 
 /**
+ * Draw an index in `[0, max)`.
+ *
+ * The source is injectable, so it must not be able to produce a name the rest
+ * of the extension would reject. A draw that is negative, fractional, past the
+ * bound, or not a number at all falls back to `0`, rather than indexing to
+ * `undefined` (which renders as the literal text `undefined`) or producing a
+ * suffix such as `--1`.
+ */
+function drawIndex(random: RandomSource, max: number): number {
+	const value = random(max);
+	return Number.isInteger(value) && value >= 0 && value < max ? value : 0;
+}
+
+/**
  * Mint a name, e.g. `swift-koala-42`.
+ *
+ * Always returns a vocabulary name in `word-word-number` form, whatever the
+ * source returns.
  *
  * @param random - integer source in `[0, max)`; defaults to `crypto.randomInt`.
  */
 export function generateName(random: RandomSource = cryptoRandomSource): string {
-	const adjective = ADJECTIVES[random(ADJECTIVES.length)] ?? ADJECTIVES[0];
-	const animal = ANIMALS[random(ANIMALS.length)] ?? ANIMALS[0];
-	const suffix = random(SUFFIX_COUNT);
+	const adjective = ADJECTIVES[drawIndex(random, ADJECTIVES.length)]!;
+	const animal = ANIMALS[drawIndex(random, ANIMALS.length)]!;
+	const suffix = drawIndex(random, SUFFIX_COUNT);
 	return `${adjective}-${animal}-${suffix}`;
 }
 

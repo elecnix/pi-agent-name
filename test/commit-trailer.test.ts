@@ -73,6 +73,32 @@ describe("addCoAuthorTrailer", () => {
 		}
 	});
 
+	it("does not mistake an option's value for the subcommand", () => {
+		// `commit` here is the VALUE of `-c` / `-C` / `--git-dir`, not the
+		// subcommand, so there is nothing to sign.
+		for (const command of [
+			"git -c commit",
+			"git -C commit",
+			"git --git-dir commit",
+			"git --work-tree commit",
+		]) {
+			assert.equal(addCoAuthorTrailer(command, NAME), command, command);
+		}
+	});
+
+	it("recognises a commit that follows a consumed option value", () => {
+		// The first `commit` is the value of --git-dir; the second is the
+		// subcommand.
+		assert.equal(
+			addCoAuthorTrailer("git --git-dir commit commit -m x", NAME),
+			`git --git-dir commit commit -m x ${TRAILER}`,
+		);
+		assert.equal(
+			addCoAuthorTrailer('git -C "/my repo" commit -m x', NAME),
+			`git -C "/my repo" commit -m x ${TRAILER}`,
+		);
+	});
+
 	it("leaves malformed shell alone", () => {
 		// Unbalanced quoting means the command is not valid shell; guessing at it
 		// could put the trailer inside a string.

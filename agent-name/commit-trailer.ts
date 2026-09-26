@@ -38,17 +38,67 @@ interface Segment {
 }
 
 /**
- * A segment that is a `git commit`, optionally behind environment assignments
- * and git's global options.
- *
- * Options may take a value attached (`-cname=v`, `--git-dir=/x`) or separated
- * by a space (`-c name=v`, `--work-tree /w`), which is why the option atom is
- * followed by an optional value token. The value lookahead refuses `commit`
- * itself and anything dash-prefixed, so the option list cannot swallow the
- * subcommand it is looking for.
+ * Git global options whose value may be attached (`-cuser.name=x`,
+ * `--git-dir=/x`) or may follow as its own token (`-c user.name=x`,
+ * `--git-dir /x`). Listing them is what lets the scan tell an option's value
+ * apart from the subcommand: without it, `git -c commit` looks like a commit
+ * when `commit` is really the value of `-c`.
  */
-const COMMIT_SEGMENT =
-	/^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*git\s+(?:(?:-[A-Za-z]\S*|--[A-Za-z][\w-]*(?:=\S+)?)(?:\s+(?!--)(?!commit(?:\s|$))\S+)?\s+)*commit(?:\s|$)/;
+const VALUE_TAKING_OPTIONS = new Set([
+	"-c",
+	"-C",
+	"--git-dir",
+	"--work-tree",
+	"--namespace",
+	"--exec-path",
+	"--config-env",
+]);
+
+/** Index just past the value starting at `index`, or -1 when it is unterminated. */
+function afterValue(tokens: readonly string[], index: number): number {
+	const first = tokens[index];
+	if (first === undefined) return -1;
+	const quote = first[0];
+	if (quote !== '"' && quote !== "'") return index + 1;
+	if (first.length > 1 && first.endsWith(quote)) return index + 1;
+	let cursor = index + 1;
+	while (cursor < tokens.length && !tokens[cursor]!.endsWith(quote)) cursor += 1;
+	return cursor < tokens.length ? cursor + 1 : -1;
+}
+
+/**
+ * True when `text` is a `git commit`, ignoring environment assignments and
+ * git's own global options in front of the subcommand.
+ *
+ * Tokenising rather than pattern-matching is what keeps the option arity
+ * straight: a `commit` that is an option's value is consumed as that value, so
+ * only a real subcommand is signed.
+ */
+function isCommitSegment(text: string): boolean {
+	const tokens = text.trim().split(/\s+/);
+	let index = 0;
+
+	while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=\S*$/.test(tokens[index]!)) index += 1;
+	if (tokens[index] !== "git") return false;
+	index += 1;
+
+	while (index < tokens.length) {
+		const token = tokens[index]!;
+		if (token === "commit") return true;
+		if (!token.startsWith("-")) return false;
+
+		const equals = token.indexOf("=");
+		const name = equals === -1 ? token : token.slice(0, equals);
+		const carriesValue = equals !== -1 || token.length > name.length;
+		index += 1;
+
+		if (!VALUE_TAKING_OPTIONS.has(name) || carriesValue) continue;
+		index = afterValue(tokens, index);
+		if (index < 0) return false;
+	}
+
+	return false;
+}
 
 /** The trailer git expects for an agent name. */
 export function coAuthorTrailer(agentName: string): string {
@@ -166,7 +216,7 @@ export function addCoAuthorTrailer(command: string, agentName: string): string {
 
 	return segments
 		.map((segment) => {
-			const isCommit = COMMIT_SEGMENT.test(segment.text) && !alreadyCredits(segment.text, name);
+			const isCommit = isCommitSegment(segment.text) && !alreadyCredits(segment.text, name);
 			if (!isCommit) return segment.text + segment.separator;
 			// Drop trailing blanks so the trailer sits next to the arguments and
 			// one space is left before the separator that follows.

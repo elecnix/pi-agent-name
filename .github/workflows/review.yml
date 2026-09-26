@@ -6,15 +6,14 @@ on:
 # Cite reviews the pull request through the GitHub API, so it needs no
 # checkout of the pull-request head and executes nothing from it.
 #
-# This repository has no MODEL_API_KEY secret, so Cite runs on GitHub's own
-# models endpoint with the ambient token (`models: read` below), which is rate
-# limited but needs no account and no key. To bring your own key, add a
-# MODEL_API_KEY repository secret and pass it as the env shown at the bottom.
+# Ollama Cloud is the default provider, as in the rest of the fleet, and the
+# CITE_PROVIDER repository variable flips this repository to OpenRouter. The
+# OpenRouter branch needs a MODEL_API_KEY secret that this repository does not
+# have yet; add it before setting CITE_PROVIDER=openrouter.
 permissions:
   contents: read
   pull-requests: write
   checks: write
-  models: read
 
 concurrency:
   group: cite-pr-${{ github.event.pull_request.number }}
@@ -24,6 +23,11 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: elecnix/cite@v0.8.0
-        # env:
-        #   MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+      - name: Review this pull request with Cite
+        uses: elecnix/cite@1c0537ba7f8df4dc5db0651f609f6b8834167150  # v0.11.2
+        with:
+          structured_output: ${{ vars.CITE_PROVIDER == 'openrouter' && 'response_format' || 'tools' }}
+          require_parameters: ${{ vars.CITE_PROVIDER == 'openrouter' }}
+          model_api_key: ${{ vars.CITE_PROVIDER == 'openrouter' && secrets.MODEL_API_KEY || secrets.OLLAMA_API_KEY }}
+          model_base_url: ${{ vars.CITE_PROVIDER == 'openrouter' && 'https://openrouter.ai/api/v1' || 'https://ollama.com/v1' }}
+          model_id: ${{ vars.CITE_PROVIDER == 'openrouter' && 'deepseek/deepseek-v4-flash-0731' || 'deepseek-v4.1-flash' }}

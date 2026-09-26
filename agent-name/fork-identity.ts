@@ -20,6 +20,13 @@ import { createHash } from "node:crypto";
 /** Length of the hex suffix appended to a forked child's name. */
 export const FORK_SUFFIX_LENGTH = 8;
 
+/**
+ * The suffix a forked child carries, recognised without recomputing it.
+ * Minted names end in a one or two digit number, so a trailing 8-hex group is
+ * unambiguous. Kept in step with `FORK_SUFFIX_LENGTH`.
+ */
+const FORK_SUFFIX_PATTERN = /-[0-9a-f]{8}$/;
+
 /** Minimal shape of a session header (`SessionManager.getHeader()`). */
 export interface SessionHeaderLike {
 	parentSession?: string;
@@ -47,8 +54,9 @@ export function composeForkIdentity(parentName: string, sessionId: string): stri
  * Re-identify a forked child session.
  *
  * Returns the suffixed name when the session is a fork and the restored name
- * is not already suffixed; otherwise returns the name unchanged. Idempotent,
- * so reloading an already-suffixed fork does not add a second suffix.
+ * is not already suffixed; otherwise returns the name unchanged. Idempotent:
+ * the existing suffix is detected rather than recomputed from the session id,
+ * so a reload cannot append a second one even if the id were to change.
  */
 export function maybeSuffixForkIdentity(
 	name: string,
@@ -57,6 +65,6 @@ export function maybeSuffixForkIdentity(
 ): string {
 	if (!name) return name;
 	if (!isForkedSession(header)) return name;
-	if (name.endsWith(`-${forkSuffixFor(sessionId)}`)) return name;
+	if (FORK_SUFFIX_PATTERN.test(name)) return name;
 	return composeForkIdentity(name, sessionId);
 }

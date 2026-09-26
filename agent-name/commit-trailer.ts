@@ -39,11 +39,16 @@ interface Segment {
 
 /**
  * A segment that is a `git commit`, optionally behind environment assignments
- * and git's global options (`-c name=value`, `-C path`, `--no-pager`,
- * `--git-dir=…`).
+ * and git's global options.
+ *
+ * Options may take a value attached (`-cname=v`, `--git-dir=/x`) or separated
+ * by a space (`-c name=v`, `--work-tree /w`), which is why the option atom is
+ * followed by an optional value token. The value lookahead refuses `commit`
+ * itself and anything dash-prefixed, so the option list cannot swallow the
+ * subcommand it is looking for.
  */
 const COMMIT_SEGMENT =
-	/^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*git\s+(?:(?:-\w\s+\S+|--?[A-Za-z][\w-]*(?:=\S+)?)\s+)*commit(?:\s|$)/;
+	/^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*git\s+(?:(?:-[A-Za-z]\S*|--[A-Za-z][\w-]*(?:=\S+)?)(?:\s+(?!--)(?!commit(?:\s|$))\S+)?\s+)*commit(?:\s|$)/;
 
 /** The trailer git expects for an agent name. */
 export function coAuthorTrailer(agentName: string): string {

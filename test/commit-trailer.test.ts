@@ -65,6 +65,9 @@ describe("addCoAuthorTrailer", () => {
 			"git -C /repo commit -m y",
 			"git --no-pager commit -m y",
 			"git --git-dir=/tmp/g commit -m y",
+			"git --git-dir /tmp/g commit -m y",
+			"git --work-tree /tmp/w commit -m y",
+			"git -C /repo --no-pager commit -m y",
 		]) {
 			assert.equal(addCoAuthorTrailer(command, NAME), `${command} ${TRAILER}`, command);
 		}

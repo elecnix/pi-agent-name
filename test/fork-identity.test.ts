@@ -57,6 +57,17 @@ describe("maybeSuffixForkIdentity", () => {
 		assert.equal(once, twice, "reload must not add a second suffix");
 	});
 
+	it("detects an existing suffix without recomputing it", () => {
+		// The suffix identifies "this name is already a child's". Detecting it
+		// rather than comparing against a hash of the current session id keeps a
+		// reload idempotent even if the session id were ever to change.
+		const suffixed = composeForkIdentity("swift-koala-42", SESSION);
+		assert.equal(
+			maybeSuffixForkIdentity(suffixed, { parentSession: "parent.jsonl" }, OTHER_SESSION),
+			suffixed,
+		);
+	});
+
 	it("returns an empty name unchanged", () => {
 		assert.equal(maybeSuffixForkIdentity("", { parentSession: "parent.jsonl" }, SESSION), "");
 	});

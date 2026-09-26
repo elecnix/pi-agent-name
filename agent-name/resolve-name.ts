@@ -8,9 +8,10 @@
  *   2. the name recorded in the session file, so a resume keeps its identity;
  *   3. a fresh mint, for a session that has neither.
  *
- * A pin that is not well formed is ignored rather than trusted, and a forked
- * child is suffixed whichever source named it, so a parent and its child never
- * share one identity.
+ * A pin that is not well formed is ignored rather than trusted. A forked child
+ * that *inherited* its parent's name is suffixed so the two cannot share one
+ * identity; a freshly minted name is left alone, because a new random name
+ * inherits nothing and a suffix there would only make it uglier.
  *
  * Kept free of pi imports so it is unit-testable with plain `node --test`.
  */
@@ -46,6 +47,10 @@ export interface ResolvedName {
  * A malformed recorded name is treated as absent: a hand-edited session file
  * must not be able to put arbitrary text into the prompt, the session title,
  * or a git trailer.
+ *
+ * The fork suffix is applied to a name that came from the pin or the session
+ * file — the two paths that can carry a parent's identity into a child — and
+ * not to a minted name, which is unique by construction.
  */
 export function resolveAgentName(input: ResolveNameInput): ResolvedName {
 	const pinned = input.pinned?.trim() ?? "";
@@ -54,6 +59,7 @@ export function resolveAgentName(input: ResolveNameInput): ResolvedName {
 
 	const base = hasPin ? pinned : hasRestored ? input.restored : "";
 	if (!base) {
+		// A fresh name inherits nothing, so the fork suffix does not apply.
 		return { name: (input.mint ?? generateName)(), source: "minted" };
 	}
 

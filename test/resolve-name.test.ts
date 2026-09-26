@@ -71,7 +71,19 @@ describe("resolveAgentName", () => {
 		assert.equal(out.source, "minted");
 	});
 
-	it("suffixes a forked child, whatever the source", () => {
+	it("does not suffix a freshly minted name, even on a fork", () => {
+		// A minted name inherits nothing; the suffix exists to break inheritance.
+		const out = resolveAgentName({
+			restored: "",
+			header: { parentSession: "parent.jsonl" },
+			sessionId: SESSION,
+			mint,
+		});
+		assert.equal(out.name, MINTED);
+		assert.equal(out.source, "minted");
+	});
+
+	it("suffixes a forked child that inherited its parent's name", () => {
 		const forked = resolveAgentName({
 			restored: MINTED,
 			header: { parentSession: "parent.jsonl" },

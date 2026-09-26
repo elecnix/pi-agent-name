@@ -53,9 +53,10 @@ flowchart TD
 3. **Mint last.** Only a session with neither a pin nor a record draws a name
    from the vocabulary.
 4. **Fork disambiguation.** A forked subtask copies its parent's entries,
-   including the name. The child is re-identified with a deterministic suffix
-   derived from its own session id, whichever source named it, so parent and
-   child never run as one name.
+   including the name. When the child inherited that name — through the pin or
+   the session file — it is re-identified with a deterministic suffix derived
+   from its own session id, so parent and child never run as one name. A
+   freshly minted name inherits nothing, so it is left alone.
 
 ## Collision risk
 

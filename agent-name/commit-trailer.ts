@@ -17,6 +17,12 @@
  *     else, or merely mentioning the words elsewhere in the command, does not
  *     suppress it — otherwise a stray string would leave the commit unsigned.
  *
+ * Known limitation: a commit nested inside another shell — `bash -c "git commit
+ * …"`, a subshell, backticks, or `$( )` — is not rewritten, because deciding
+ * whether a nested string is a command would need a real shell parser rather
+ * than a scanner. Such a commit is left alone, which loses the trailer; the
+ * rewrite never guesses inside a nested string, so it cannot corrupt one.
+ *
  * Kept free of pi imports so it is unit-testable with plain `node --test`.
  */
 

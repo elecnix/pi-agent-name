@@ -53,11 +53,14 @@ export interface ResolvedName {
  * not to a minted name, which is unique by construction.
  */
 export function resolveAgentName(input: ResolveNameInput): ResolvedName {
+	// Both sources are trimmed here rather than trusted from the caller, so the
+	// value that is validated is the value that is used.
 	const pinned = input.pinned?.trim() ?? "";
+	const restored = input.restored.trim();
 	const hasPin = isWellFormedAgentName(pinned);
-	const hasRestored = isWellFormedAgentName(input.restored);
+	const hasRestored = isWellFormedAgentName(restored);
 
-	const base = hasPin ? pinned : hasRestored ? input.restored : "";
+	const base = hasPin ? pinned : hasRestored ? restored : "";
 	if (!base) {
 		// A fresh name inherits nothing, so the fork suffix does not apply.
 		return { name: (input.mint ?? generateName)(), source: "minted" };

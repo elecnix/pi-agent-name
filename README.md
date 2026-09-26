@@ -13,7 +13,7 @@ The extension gives every pi session one name and puts it to work:
 | Session name | The session is named after the agent, so a window is identifiable at a glance |
 | System prompt | Identity rules are injected, so the agent signs its work consistently |
 | `PI_AGENT_NAME` | Every shell command the agent runs can read its own name |
-| Git commits | A `Co-authored-by` trailer is added to each commit automatically |
+| Git commits | The identity rules instruct the agent to add a `Co-authored-by` trailer to each commit |
 | `/whoami` | Prints the current name |
 | `session_rename` tool | Renames the session to `<agent-name>: <task>` without losing the name prefix |
 

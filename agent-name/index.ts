@@ -19,10 +19,8 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { applyAgentNameEnv } from "./env.ts";
-import { addCoAuthorTrailer } from "./commit-trailer.ts";
 import { buildIdentityPrompt } from "./identity-prompt.ts";
 import { NAME_ENV, OWN_NAME_ENTRY, SHARED_NAME_ENTRY, restoreAgentName } from "./persisted-name.ts";
 import { resolveAgentName } from "./resolve-name.ts";
@@ -75,15 +73,6 @@ export default function (pi: ExtensionAPI) {
 		const currentPrompt = event.systemPrompt ?? "";
 		if (currentPrompt.includes("<agent_identity>")) return;
 		return { systemPrompt: `${currentPrompt}\n${buildIdentityPrompt(agentName)}` };
-	});
-
-	// Sign commits automatically; the prompt rule asks for the trailer, this
-	// makes it true even when the agent forgets. The rewrite understands shell
-	// chains, so the trailer stays on the commit rather than the command after it.
-	pi.on("tool_call", async (event) => {
-		if (event.toolName !== "bash") return;
-		if (!isToolCallEventType("bash", event)) return;
-		event.input.command = addCoAuthorTrailer(event.input.command ?? "", agentName);
 	});
 
 	pi.registerTool({

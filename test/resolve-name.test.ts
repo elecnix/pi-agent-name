@@ -65,6 +65,12 @@ describe("resolveAgentName", () => {
 		}
 	});
 
+	it("trims a recorded name before using it", () => {
+		const out = resolveAgentName({ restored: "  swift-koala-42  ", sessionId: SESSION, mint });
+		assert.equal(out.name, "swift-koala-42");
+		assert.equal(out.source, "restored");
+	});
+
 	it("ignores a malformed recorded name and mints a fresh one", () => {
 		const out = resolveAgentName({ restored: "not a name", sessionId: SESSION, mint });
 		assert.equal(out.name, MINTED);

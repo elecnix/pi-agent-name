@@ -87,11 +87,17 @@ function isCommitSegment(text: string): boolean {
 		if (token === "commit") return true;
 		if (!token.startsWith("-")) return false;
 
-		const equals = token.indexOf("=");
-		const name = equals === -1 ? token : token.slice(0, equals);
-		const carriesValue = equals !== -1 || token.length > name.length;
+		// A long option is named up to its `=`; a short option is two characters
+		// (`-c`), with any remainder an attached value. Reading the name this way
+		// is what makes `-cuser.name=x` resolve to the known value-taking `-c`
+		// instead of to an unrecognised token.
+		const name = token.startsWith("--")
+			? token.slice(0, token.indexOf("=") === -1 ? undefined : token.indexOf("="))
+			: token.slice(0, 2);
+		const carriesValue = token.length > name.length;
 		index += 1;
 
+		// Already carries its value, or takes none: nothing more to consume.
 		if (!VALUE_TAKING_OPTIONS.has(name) || carriesValue) continue;
 		index = afterValue(tokens, index);
 		if (index < 0) return false;

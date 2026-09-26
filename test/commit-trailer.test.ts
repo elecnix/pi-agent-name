@@ -73,6 +73,19 @@ describe("addCoAuthorTrailer", () => {
 		}
 	});
 
+	it("treats a short option's attached value as its value", () => {
+		// `-cuser.name=x` is `-c` plus an attached value, not an unknown flag
+		// that happens to be followed by `commit`.
+		for (const command of [
+			"git -cuser.name=x commit -m y",
+			"git -C/repo commit -m y",
+			"git -cuser.name=commit commit -m y",
+			"git -c=commit commit -m y",
+		]) {
+			assert.equal(addCoAuthorTrailer(command, NAME), `${command} ${TRAILER}`, command);
+		}
+	});
+
 	it("does not mistake an option's value for the subcommand", () => {
 		// `commit` here is the VALUE of `-c` / `-C` / `--git-dir`, not the
 		// subcommand, so there is nothing to sign.

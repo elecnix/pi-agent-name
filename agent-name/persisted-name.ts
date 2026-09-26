@@ -53,11 +53,15 @@ export function restoreAgentName(entries: readonly unknown[]): string {
  * True when `name` is a safe agent identifier.
  *
  * The accepted forms are the minted `word-word-number` and the suffixed
- * `word-word-number-<8 hex>` a forked child carries. The guard matters because
- * the name reaches prompt text, git trailers, and a session title from places
- * the extension does not control (an environment variable, a hand-edited
- * session file), so whitespace, punctuation, and unexpected extra segments are
- * rejected rather than trusted.
+ * `word-word-number-<8 hex>` a forked child carries. The number is one or two
+ * digits because minting draws `0` through `99` and does not pad: `swift-koala-0`
+ * and `swift-koala-7` are names this extension produces, so requiring exactly
+ * two digits would reject its own output.
+ *
+ * The guard matters because the name reaches prompt text, git trailers, and a
+ * session title from places the extension does not control (an environment
+ * variable, a hand-edited session file), so whitespace, punctuation, and
+ * unexpected extra segments are rejected rather than trusted.
  */
 export function isWellFormedAgentName(name: string): boolean {
 	return /^[a-z]+-[a-z]+-\d{1,2}(?:-[0-9a-f]{8})?$/.test(name);

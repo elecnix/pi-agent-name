@@ -98,9 +98,17 @@ describe("pickFreshAgentName", () => {
 	});
 
 	it("returns the last draw rather than failing when every attempt collides", () => {
-		const always = `${ADJECTIVES[0]}-${ANIMALS[0]}-0`;
-		const random = scriptedRandom([0, 0, 0]);
-		assert.equal(pickFreshAgentName(new Set([always]), random), always);
+		// Every draw lands on a taken name, so the attempts are exhausted. The
+		// contract is to return the FINAL draw — not the first one, and not a
+		// throw — because a duplicate name still beats starting without one.
+		// Asserting the last draw (not the first) is what distinguishes the
+		// deliberate fallback from a bug that returns the first collision.
+		const first = `${ADJECTIVES[0]}-${ANIMALS[0]}-0`;
+		const last = `${ADJECTIVES[1]}-${ANIMALS[1]}-1`;
+		const random = scriptedRandom([0, 0, 0, 1, 1, 1]);
+		const drawn = pickFreshAgentName(new Set([first, last]), random);
+		assert.equal(drawn, last);
+		assert.match(drawn, /^[a-z]+-[a-z]+-\d{1,2}$/);
 	});
 
 	it("draws at most maxAttempts times", () => {

@@ -23,11 +23,10 @@ import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { applyAgentNameEnv } from "./env.ts";
 import { addCoAuthorTrailer } from "./commit-trailer.ts";
-import { maybeSuffixForkIdentity } from "./fork-identity.ts";
 import { buildIdentityPrompt } from "./identity-prompt.ts";
-import { NAME_ENV, OWN_NAME_ENTRY, SHARED_NAME_ENTRY, isWellFormedAgentName, restoreAgentName } from "./persisted-name.ts";
+import { NAME_ENV, OWN_NAME_ENTRY, SHARED_NAME_ENTRY, restoreAgentName } from "./persisted-name.ts";
+import { resolveAgentName } from "./resolve-name.ts";
 import { composeSessionName, SESSION_RENAME_TOOL_DESCRIPTION } from "./session-name.ts";
-import { generateName } from "./names.ts";
 
 let agentName = "";
 
@@ -41,26 +40,21 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
 		agentName = "";
 
-		// 1. Resume the name this session already has. A hand-edited or foreign
-		//    entry that is not a well-formed name is ignored rather than trusted.
-		const restored = restoreAgentName(ctx.sessionManager.getEntries());
-		agentName = isWellFormedAgentName(restored) ? restored : "";
+		// Resolve the name: an explicit pin wins, then the name the session file
+		// remembers, then a fresh mint. A forked child is suffixed whichever
+		// source named it, so a parent and its child never share one identity.
+		const recorded = restoreAgentName(ctx.sessionManager.getEntries());
+		const resolution = resolveAgentName({
+			restored: recorded,
+			pinned: process.env[NAME_ENV],
+			header: ctx.sessionManager.getHeader(),
+			sessionId: ctx.sessionManager.getSessionId(),
+		});
+		agentName = resolution.name;
 
-		// 2. Re-identify a forked child so parent and child do not run as one name.
-		if (agentName) {
-			const beforeFork = agentName;
-			agentName = maybeSuffixForkIdentity(
-				agentName,
-				ctx.sessionManager.getHeader(),
-				ctx.sessionManager.getSessionId(),
-			);
-			if (agentName !== beforeFork) persistAgentName(pi, agentName);
-		}
-
-		// 3. Otherwise take an explicit name, or mint one.
-		if (!agentName) {
-			const pinned = process.env[NAME_ENV]?.trim() ?? "";
-			agentName = isWellFormedAgentName(pinned) ? pinned : generateName();
+		// Record the name unless the session simply resumed the one it had, so a
+		// reload does not grow the session file on every start.
+		if (resolution.source !== "restored" || resolution.name !== recorded) {
 			persistAgentName(pi, agentName);
 		}
 

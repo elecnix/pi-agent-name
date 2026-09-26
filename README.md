@@ -30,30 +30,32 @@ source of truth. There is no registry to consult and no process to keep alive.
 
 ```mermaid
 flowchart TD
-    S[Session starts] --> R{Name recorded<br />in the session file?}
-    R -->|yes| V{Well formed?}
-    R -->|no| P{AGENT_IDENTITY_NAME<br />environment variable set?}
-    V -->|yes| F{Forked child?}
-    V -->|no| M[Mint a new name]
-    P -->|yes| V2{Well formed?}
-    P -->|no| M
-    V2 -->|yes| U[Use the pinned name]
-    V2 -->|no| M
-    M --> W[Record the name in the session file]
-    U --> W
-    F -->|no| W
+    S[Session starts] --> P{AGENT_IDENTITY_NAME<br />set and well formed?}
+    P -->|yes| PIN[Use the pinned name]
+    P -->|no| R{Recorded in the session file<br />and well formed?}
+    R -->|yes| REC[Use the recorded name]
+    R -->|no| M[Mint a new name]
+    PIN --> F{Forked child?}
+    REC --> F
+    M --> F
     F -->|yes| X[Append a session-id suffix]
+    F -->|no| W[Record the name in the session file]
     X --> W
     W --> E[Set the session name, expose PI_AGENT_NAME,<br />inject the identity prompt]
 ```
 
-1. **Restore first.** The name is read back from the session file, so a reload
-   or a resumed conversation keeps the identity it already had.
-2. **Fork disambiguation.** A forked subtask copies its parent's entries,
+1. **An explicit pin wins.** `AGENT_IDENTITY_NAME`, when it is set and well
+   formed, overrides whatever the session file remembers. This is the pin used
+   by tests, scripts, and session revival; a pin that is not well formed is
+   ignored rather than trusted.
+2. **Then the recorded name.** A reload or a resumed conversation keeps the
+   identity it already had.
+3. **Mint last.** Only a session with neither a pin nor a record draws a name
+   from the vocabulary.
+4. **Fork disambiguation.** A forked subtask copies its parent's entries,
    including the name. The child is re-identified with a deterministic suffix
-   derived from its own session id, so parent and child never run as one name.
-3. **Mint last.** A new session takes `AGENT_IDENTITY_NAME` when it is set and
-   well formed, and otherwise mints a name from the vocabulary.
+   derived from its own session id, whichever source named it, so parent and
+   child never run as one name.
 
 ## Collision risk
 
@@ -93,6 +95,13 @@ never injected twice.
 
 The larger extension adds intercom addressing, offline revival, and mention
 tracking on top of the same name. Install this one when a name is all you want.
+
+## Configuration
+
+| Variable | Direction | Effect |
+|---|---|---|
+| `AGENT_IDENTITY_NAME` | read at session start | Pins the name. When set and well formed it overrides the recorded name; otherwise the session keeps the name it had. |
+| `PI_AGENT_NAME` | written for shell commands | The resolved name, exported to every `bash` tool call. It is output only: a nested pi session that inherits it does not adopt it, because two live sessions must not share one name. |
 
 ## Development
 

@@ -23,7 +23,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
-      - uses: elecnix/gh-pr-body-action@16953182e3b991b7d081d844b395754fdfb91880  # v1.1.0
+      - uses: elecnix/gh-pr-body-action@08c74dc0736abe295e90d6363abd55cf7ea63ef3  # v1.2.1
         with:
           # Prose findings block: the description is documentation too.
           prose-fail: 'true'

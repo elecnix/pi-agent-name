@@ -11,11 +11,39 @@ The extension gives every pi session one name and puts it to work:
 | Surface | Effect |
 |---|---|
 | Session name | The session is named after the agent, so a window is identifiable at a glance |
+| Footer | The name sits in the footer as well, so a hand-typed rename cannot bury it |
 | System prompt | Identity rules are injected, so the agent signs its work consistently |
 | `PI_AGENT_NAME` | Every shell command the agent runs can read its own name |
 | Git commits | The identity rules instruct the agent to add a `Co-authored-by` trailer to each commit |
 | `/whoami` | Prints the current name |
 | `session_rename` tool | Renames the session to `<agent-name>: <task>` without losing the name prefix |
+
+## The footer stays when the session name does not
+
+A session name is mutable. `/name` replaces it wholesale, and so does any tool
+that renames a session, so the `<agent-name>: ` prefix that `session_rename`
+composes can disappear at any moment. The footer widget is the copy that
+cannot: its text is derived from the identity the session was minted with,
+never from the name the session currently displays.
+
+The widget is registered through [pi-footer-widget](https://github.com/elecnix/pi-footer-widget),
+a bridge over pi-statusbar, pi-powerline-footer, and the stock footer, so the
+name lands wherever the user's footer keeps extension statuses. On the stock
+footer it reads as one extension status line:
+
+```text
+theme-picker (feat/theme-picker) • swift-koala-42
+12.4%/1.0M (auto)                          (ollama) glm-5.3:cloud • high
+agent swift-koala-42
+```
+
+A `/name` that drops the session prefix only changes the first line.
+
+Registration is best-effort. Without the bridge, the name falls back to
+`ctx.ui.setStatus`, which is what the bridge itself does on a push composer,
+and a bridge that fails to load or throws is treated as if it were missing. A
+footer widget is a nicety; it must never be the reason a session fails to
+start.
 
 ## Install
 
@@ -82,9 +110,13 @@ afterwards. That is the deliberate trade for having no registry.
 
 ## Standalone by construction
 
-The extension imports nothing beyond the Node standard library and the pi
-extension API. It opens no socket, starts no child process, and writes no files
-outside the session. Stopping pi stops everything the extension does.
+The extension imports nothing beyond the Node standard library, the pi
+extension API, and one optional footer bridge. It opens no socket, starts no
+child process, and writes no files outside the session. Stopping pi stops
+everything the extension does.
+
+That bridge, `pi-footer-widget`, is optional at run time: it carries the name
+into the footer, and the extension keeps working without it.
 
 ## Using it alongside pi-agent-identity
 
@@ -103,6 +135,11 @@ tracking on top of the same name. Install this one when a name is all you want.
 |---|---|---|
 | `AGENT_IDENTITY_NAME` | read at session start | Pins the name. When set and well formed it overrides the recorded name; otherwise the session keeps the name it had. |
 | `PI_AGENT_NAME` | written for shell commands | The resolved name, exported to every `bash` tool call. It is output only: a nested pi session that inherits it does not adopt it, because two live sessions must not share one name. |
+
+## Requirements
+
+`pi-footer-widget` is a runtime dependency, installed by pi with the extension.
+The extension still starts when it is absent; only the footer widget is lost.
 
 ## Development
 

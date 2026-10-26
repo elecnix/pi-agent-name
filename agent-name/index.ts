@@ -8,7 +8,8 @@
  *
  * This extension is standalone. It has no daemon, no socket, and no dependency
  * on pi-intercom: a name is minted locally and persisted in the session file,
- * which is the only source of truth.
+ * which is the only source of truth. Its one dependency, pi-footer-widget, is
+ * optional at run time and only carries the name into the footer.
  *
  * Name collisions are possible in principle and are mitigated by the size of
  * the vocabulary rather than by a registry — see `agent-name/names.ts`.
@@ -18,15 +19,32 @@
  * extension, so installing both converges on one name instead of minting two.
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { applyAgentNameEnv } from "./env.ts";
+import { type FooterWidgetHandle, registerAgentNameWidget } from "./footer.ts";
 import { buildIdentityPrompt } from "./identity-prompt.ts";
 import { NAME_ENV, OWN_NAME_ENTRY, SHARED_NAME_ENTRY, restoreAgentName } from "./persisted-name.ts";
 import { resolveAgentName } from "./resolve-name.ts";
 import { composeSessionName, SESSION_RENAME_TOOL_DESCRIPTION } from "./session-name.ts";
 
 let agentName = "";
+let footerWidget: FooterWidgetHandle | undefined;
+
+/**
+ * Keep the agent name in the footer, where a rename cannot reach it.
+ *
+ * The session name is mutable — `/name` replaces it outright — so the footer
+ * is what keeps the identity visible after a user renames the session. The
+ * widget is best-effort: it needs a UI to draw in, and the registration itself
+ * is allowed to fail without taking the session down with it.
+ */
+async function showAgentNameWidget(ctx: ExtensionContext): Promise<void> {
+	footerWidget?.dispose();
+	footerWidget = undefined;
+	if (!ctx.hasUI) return;
+	footerWidget = await registerAgentNameWidget(ctx, agentName);
+}
 
 /** Record the name in the session file under both entry types. */
 function persistAgentName(pi: ExtensionAPI, name: string): void {
@@ -64,6 +82,16 @@ export default function (pi: ExtensionAPI) {
 		if (ctx.hasUI) {
 			ctx.ui.notify(`Agent name: ${agentName}`, "info");
 		}
+
+		await showAgentNameWidget(ctx);
+	});
+
+	// The footer outlives nothing: clear the status so a resumed session does not
+	// inherit a stale one from the session that ran before it.
+	pi.on("session_shutdown", async () => {
+		footerWidget?.dispose();
+		footerWidget = undefined;
+		agentName = "";
 	});
 
 	// Put the identity rules in the system prompt. The tag check keeps a second

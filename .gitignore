@@ -1,0 +1,5 @@
+# pi installs this extension's dependencies itself, in its own copy of the
+# package, so a lockfile here would describe a tree nothing else uses. Keep a
+# local install out of the repository.
+node_modules/
+package-lock.json

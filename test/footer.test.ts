@@ -65,6 +65,26 @@ const bridgeLoader =
 	async () =>
 		bridge;
 
+const NAME = "keen-gar-77";
+const EXPECTED_TEXT = `agent ${NAME}`;
+
+const failingLoader: FooterBridgeLoader = async () => {
+	throw new Error("module not found");
+};
+
+const throwingBridge = {
+	registerFooterWidget() {
+		throw new Error("composer exploded");
+	},
+} as unknown as Partial<FooterWidgetBridge>;
+
+/** Register against a fresh context and report what the footer was told. */
+async function register(load: FooterBridgeLoader, hasUI = true, name = NAME) {
+	const { ctx, statuses } = makeContext(hasUI);
+	const handle = await registerAgentNameWidget(ctx, name, load);
+	return { handle, statuses };
+}
+
 describe("agentNameWidgetText", () => {
 	it("says what the value is, because pi renders values without their keys", () => {
 		assert.equal(agentNameWidgetText("keen-gar-77"), "agent keen-gar-77");
@@ -85,78 +105,51 @@ describe("registerAgentNameWidget", () => {
 		const { ctx, statuses } = makeContext();
 		const { bridge, registered } = makeBridge();
 
-		const handle = await registerAgentNameWidget(ctx, "keen-gar-77", bridgeLoader(bridge));
+		const handle = await registerAgentNameWidget(ctx, NAME, bridgeLoader(bridge));
 
 		assert.ok(handle);
 		assert.equal(registered.length, 1);
 		assert.equal(registered[0]?.id, AGENT_NAME_WIDGET_ID);
 		// The text comes from the identity, never from the mutable session name,
 		// so a user rename cannot change or hide it.
-		assert.equal(registered[0]?.render(), "agent keen-gar-77");
+		assert.equal(registered[0]?.render(), EXPECTED_TEXT);
 		// The bridge owns emission, so the extension does not also write a status.
 		assert.deepEqual(statuses, []);
 	});
 
-	it("falls back to setStatus when the bridge is not installed", async () => {
-		const { ctx, statuses } = makeContext();
+	const degraded: Array<[string, FooterBridgeLoader]> = [
+		["the bridge is not installed", bridgeLoader(undefined)],
+		["the bridge fails to load", failingLoader],
+		["the bridge throws while registering", bridgeLoader(throwingBridge)],
+	];
 
-		const handle = await registerAgentNameWidget(ctx, "keen-gar-77", bridgeLoader(undefined));
+	for (const [scenario, load] of degraded) {
+		it(`falls back to setStatus when ${scenario}`, async () => {
+			const { handle, statuses } = await register(load);
 
-		assert.ok(handle);
-		assert.deepEqual(statuses, [[AGENT_NAME_WIDGET_ID, "agent keen-gar-77"]]);
-	});
+			assert.ok(handle);
+			assert.deepEqual(statuses, [[AGENT_NAME_WIDGET_ID, EXPECTED_TEXT]]);
+		});
+	}
 
-	it("falls back to setStatus when the bridge fails to load", async () => {
-		const { ctx, statuses } = makeContext();
-		const failing: FooterBridgeLoader = async () => {
-			throw new Error("module not found");
-		};
+	const silent: Array<[string, boolean, string]> = [
+		["without a UI", false, NAME],
+		["for a blank name", true, "  "],
+	];
 
-		await registerAgentNameWidget(ctx, "keen-gar-77", failing);
+	for (const [scenario, hasUI, name] of silent) {
+		it(`does nothing ${scenario}`, async () => {
+			const { bridge, registered } = makeBridge();
+			const { handle, statuses } = await register(bridgeLoader(bridge), hasUI, name);
 
-		assert.deepEqual(statuses, [[AGENT_NAME_WIDGET_ID, "agent keen-gar-77"]]);
-	});
-
-	it("falls back to setStatus when the bridge throws while registering", async () => {
-		const { ctx, statuses } = makeContext();
-		const broken = {
-			registerFooterWidget() {
-				throw new Error("composer exploded");
-			},
-		} as unknown as Partial<FooterWidgetBridge>;
-
-		const handle = await registerAgentNameWidget(ctx, "keen-gar-77", bridgeLoader(broken));
-
-		assert.ok(handle);
-		assert.deepEqual(statuses, [[AGENT_NAME_WIDGET_ID, "agent keen-gar-77"]]);
-	});
-
-	it("does nothing without a UI", async () => {
-		const { ctx, statuses } = makeContext(false);
-		const { bridge, registered } = makeBridge();
-
-		const handle = await registerAgentNameWidget(ctx, "keen-gar-77", bridgeLoader(bridge));
-
-		assert.equal(handle, undefined);
-		assert.deepEqual(statuses, []);
-		assert.equal(registered.length, 0);
-	});
-
-	it("does nothing for a blank name", async () => {
-		const { ctx, statuses } = makeContext();
-		const { bridge, registered } = makeBridge();
-
-		const handle = await registerAgentNameWidget(ctx, "  ", bridgeLoader(bridge));
-
-		assert.equal(handle, undefined);
-		assert.deepEqual(statuses, []);
-		assert.equal(registered.length, 0);
-	});
+			assert.equal(handle, undefined);
+			assert.deepEqual(statuses, []);
+			assert.equal(registered.length, 0);
+		});
+	}
 
 	it("clears the status when the fallback handle is disposed", async () => {
-		const { ctx, statuses } = makeContext();
-
-		const handle = await registerAgentNameWidget(ctx, "keen-gar-77", bridgeLoader(undefined));
+		const { handle, statuses } = await register(bridgeLoader(undefined));
 		handle?.dispose();
 
 		assert.deepEqual(statuses.at(-1), [AGENT_NAME_WIDGET_ID, undefined]);
@@ -166,7 +159,7 @@ describe("registerAgentNameWidget", () => {
 		const { ctx } = makeContext();
 		const { bridge, disposed } = makeBridge();
 
-		const handle = await registerAgentNameWidget(ctx, "keen-gar-77", bridgeLoader(bridge));
+		const handle = await registerAgentNameWidget(ctx, NAME, bridgeLoader(bridge));
 		handle?.dispose();
 
 		assert.equal(disposed(), 1);

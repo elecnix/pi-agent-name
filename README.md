@@ -39,10 +39,14 @@ agent swift-koala-42
 
 A `/name` that drops the session prefix only changes the first line.
 
-Registration is best-effort. Without the bridge, the name falls back to
-`ctx.ui.setStatus`, which is what the bridge itself does on a push composer,
-and a bridge that fails to load or throws is treated as if it were missing. A
-footer widget is a nicety; it must never be the reason a session fails to
+The widget adds a line to the footer; it never replaces one. That holds on
+every composer the bridge covers, and it holds when the bridge is not there:
+rather than draw a footer of its own, the extension writes nothing at all, so
+nothing already displayed is displaced. A missing dependency costs the agent
+name in the footer, and nothing else.
+
+A bridge that fails to load or throws while registering is treated as missing.
+A footer widget is a nicety; it must never be the reason a session fails to
 start.
 
 ## Install
@@ -139,7 +143,8 @@ tracking on top of the same name. Install this one when a name is all you want.
 ## Requirements
 
 `pi-footer-widget` is a runtime dependency, installed by pi with the extension.
-The extension still starts when it is absent; only the footer widget is lost.
+Without it the extension still starts and still names the session; only the
+footer line is absent, and nothing else in the footer changes.
 
 ## Development
 

@@ -22,10 +22,11 @@ type Registered = {
 	layout?: { placement?: string; priority?: number };
 };
 
-/** A context that records every setStatus call, like the stock footer would. */
+/** A context that records every setStatus call, so "wrote nothing" is provable. */
 function makeContext(hasUI = true) {
 	const statuses: Array<[string, string | undefined]> = [];
 	return {
+		statuses,
 		ctx: {
 			hasUI,
 			ui: {
@@ -34,7 +35,6 @@ function makeContext(hasUI = true) {
 				},
 			},
 		},
-		statuses,
 	};
 }
 
@@ -78,7 +78,7 @@ const throwingBridge = {
 	},
 } as unknown as Partial<FooterWidgetBridge>;
 
-/** Register against a fresh context and report what the footer was told. */
+/** Register against a fresh context and report everything observable. */
 async function register(load: FooterBridgeLoader, hasUI = true, name = NAME) {
 	const { ctx, statuses } = makeContext(hasUI);
 	const handle = await registerAgentNameWidget(ctx, name, load);
@@ -87,11 +87,11 @@ async function register(load: FooterBridgeLoader, hasUI = true, name = NAME) {
 
 describe("agentNameWidgetText", () => {
 	it("says what the value is, because pi renders values without their keys", () => {
-		assert.equal(agentNameWidgetText("keen-gar-77"), "agent keen-gar-77");
+		assert.equal(agentNameWidgetText(NAME), EXPECTED_TEXT);
 	});
 
 	it("trims the name", () => {
-		assert.equal(agentNameWidgetText("  keen-gar-77  "), "agent keen-gar-77");
+		assert.equal(agentNameWidgetText(`  ${NAME}  `), EXPECTED_TEXT);
 	});
 
 	it("shows nothing for a blank name", () => {
@@ -117,6 +117,8 @@ describe("registerAgentNameWidget", () => {
 		assert.deepEqual(statuses, []);
 	});
 
+	// Without a working bridge the footer must be left exactly as it was: no
+	// line of our own in place of whatever the composer already draws.
 	const degraded: Array<[string, FooterBridgeLoader]> = [
 		["the bridge is not installed", bridgeLoader(undefined)],
 		["the bridge fails to load", failingLoader],
@@ -124,11 +126,11 @@ describe("registerAgentNameWidget", () => {
 	];
 
 	for (const [scenario, load] of degraded) {
-		it(`falls back to setStatus when ${scenario}`, async () => {
+		it(`adds nothing when ${scenario}`, async () => {
 			const { handle, statuses } = await register(load);
 
-			assert.ok(handle);
-			assert.deepEqual(statuses, [[AGENT_NAME_WIDGET_ID, EXPECTED_TEXT]]);
+			assert.equal(handle, undefined);
+			assert.deepEqual(statuses, []);
 		});
 	}
 
@@ -138,7 +140,7 @@ describe("registerAgentNameWidget", () => {
 	];
 
 	for (const [scenario, hasUI, name] of silent) {
-		it(`does nothing ${scenario}`, async () => {
+		it(`adds nothing ${scenario}`, async () => {
 			const { bridge, registered } = makeBridge();
 			const { handle, statuses } = await register(bridgeLoader(bridge), hasUI, name);
 
@@ -148,14 +150,7 @@ describe("registerAgentNameWidget", () => {
 		});
 	}
 
-	it("clears the status when the fallback handle is disposed", async () => {
-		const { handle, statuses } = await register(bridgeLoader(undefined));
-		handle?.dispose();
-
-		assert.deepEqual(statuses.at(-1), [AGENT_NAME_WIDGET_ID, undefined]);
-	});
-
-	it("delegates disposal to the bridge handle", async () => {
+	it("leaves disposal to the bridge handle it returned", async () => {
 		const { ctx } = makeContext();
 		const { bridge, disposed } = makeBridge();
 

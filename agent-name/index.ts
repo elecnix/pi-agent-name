@@ -36,8 +36,8 @@ let footerWidget: FooterWidgetHandle | undefined;
  *
  * The session name is mutable — `/name` replaces it outright — so the footer
  * is what keeps the identity visible after a user renames the session. The
- * widget is best-effort: it needs a UI to draw in, and the registration itself
- * is allowed to fail without taking the session down with it.
+ * widget only ever adds to the footer's existing content: with no working
+ * bridge, nothing is written at all rather than a line of our own.
  */
 async function showAgentNameWidget(ctx: ExtensionContext): Promise<void> {
 	footerWidget?.dispose();

@@ -11,14 +11,13 @@
  * pi-statusbar, pi-powerline-footer, and the stock footer, so the name lands
  * wherever the user's footer keeps extension statuses.
  *
- * The bridge is imported dynamically and its absence is not an error. Without
- * it, the name falls back to `ctx.ui.setStatus`, which is what the bridge
- * itself does on a push composer. The extension therefore keeps working when
- * the dependency is missing, uninstalled, or broken — the widget degrades, the
- * identity does not.
+ * The widget is additive or absent, never a substitute. Composers show a widget
+ * next to what they already display; the bridge clears only the key it owns;
+ * and when the bridge is missing or fails, this extension writes nothing at
+ * all rather than putting a line of its own where something else used to be.
  */
 
-/** The status key, and widget id, that carries the agent name. */
+/** The widget id, and the status key the bridge owns on this extension's behalf. */
 export const AGENT_NAME_WIDGET_ID = "agent-name";
 
 /**
@@ -54,7 +53,6 @@ export interface FooterWidgetHandle {
 /** The slice of the pi extension context the widget needs. */
 export interface FooterWidgetContext {
 	hasUI: boolean;
-	ui: { setStatus(key: string, text: string | undefined): void };
 }
 
 /** Resolves the bridge, or `undefined` when it is not available. */
@@ -80,9 +78,9 @@ export const loadFooterWidgetBridge: FooterBridgeLoader = async () => {
  * Show the agent name in the footer.
  *
  * Returns a handle so the caller can dispose the widget at shutdown, or
- * `undefined` when there is no name to show or no UI to show it in. A bridge
- * that throws is treated like a bridge that is missing, because the name
- * must survive a broken composer.
+ * `undefined` when there is nothing to show it in and nothing was written. A
+ * bridge that is missing, fails to load, or throws leaves the footer exactly as
+ * it was: this extension adds a name, never a footer.
  */
 export async function registerAgentNameWidget(
 	ctx: FooterWidgetContext,
@@ -94,26 +92,16 @@ export async function registerAgentNameWidget(
 
 	const bridge = await load().catch(() => undefined);
 	const register = bridge?.registerFooterWidget;
-	if (typeof register === "function") {
-		try {
-			return register(ctx, {
-				id: AGENT_NAME_WIDGET_ID,
-				render: () => text,
-				selfColorize: false,
-				layout: { placement: "line3", priority: 50 },
-			});
-		} catch {
-			/* fall through: a broken bridge must not cost the name */
-		}
-	}
+	if (typeof register !== "function") return undefined;
 
-	ctx.ui.setStatus(AGENT_NAME_WIDGET_ID, text);
-	return {
-		update(next: string): void {
-			ctx.ui.setStatus(AGENT_NAME_WIDGET_ID, next || undefined);
-		},
-		dispose(): void {
-			ctx.ui.setStatus(AGENT_NAME_WIDGET_ID, undefined);
-		},
-	};
+	try {
+		return register(ctx, {
+			id: AGENT_NAME_WIDGET_ID,
+			render: () => text,
+			selfColorize: false,
+			layout: { placement: "line3", priority: 50 },
+		});
+	} catch {
+		return undefined;
+	}
 }

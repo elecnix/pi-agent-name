@@ -23,5 +23,8 @@
   },
   "scripts": {
     "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "dependencies": {
+    "pi-footer-widget": "^0.1.1"
   }
 }

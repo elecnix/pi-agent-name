@@ -49,6 +49,34 @@ A bridge that fails to load or throws while registering is treated as missing.
 A footer widget is a nicety; it must never be the reason a session fails to
 start.
 
+### What each composer shows
+
+Each capture below is one pi session with this extension loaded; only the
+composer changes.
+
+**The stock footer** keeps both of its lines and gains a third:
+
+![the agent name added as a third footer line](docs/screenshots/footer-widget/1-stock.png)
+
+**`pi-powerline-footer`** shows the name at the end of its own line, after the
+git branch, placed by its `customItems` configuration:
+
+![the agent name at the end of the composer footer](docs/screenshots/footer-widget/2-powerline-footer.png)
+
+**`pi-statusbar`** shows nothing from this extension. Its published `0.2.4`
+documents a registry at `globalThis.__piStatusbarRegistry` for widgets to attach
+to, but the package never creates it: the name appears three times in its README
+and not once in its source (release `v0.2.4`, commit `54cce05`). That composer
+does not render the plain status channel either, so with it alone the agent name
+cannot appear. Replacing its footer is the one thing this extension will not do.
+
+![the composer footer without the agent name](docs/screenshots/footer-widget/3-statusbar.png)
+
+**Both together** — the last composer to install the footer owns it, so
+`pi-powerline-footer` draws it and carries the name:
+
+![both composers installed, the agent name on the composer footer](docs/screenshots/footer-widget/4-both-composers.png)
+
 ## Install
 
 ```bash
